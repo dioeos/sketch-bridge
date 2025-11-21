@@ -1,0 +1,22 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Uvicorn reload cache
+*.reload
+*.pid
+
+# ---- Misc ----
+*.swp
+*.swo
