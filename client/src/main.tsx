@@ -9,6 +9,8 @@ import "./index.css";
 import HostInit from "./pages/HostPage/HostInit.tsx";
 import HostRoom from "./pages/HostPage/HostPage.tsx";
 
+import JoinPage from "./pages/JoinPage/JoinPage.tsx";
+
 // createRoot(document.getElementById('root')!).render(
 //   <StrictMode>
 //     <App />
@@ -24,6 +26,7 @@ ReactDOM.createRoot(root).render(
       <Route path="/" element={<App />} />
       <Route path="/host" element={<HostInit />} />
       <Route path="/host/:code" element={<HostRoom />} />
+      <Route path="/join" element={<JoinPage />} />
     </Routes>
   </BrowserRouter>,
 );
