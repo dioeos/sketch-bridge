@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from typing import Dict, List, Tuple
+from datetime import datetime
 
-import uuid, base64
+import uuid, base64, json
 
 import logger
 log = logger.logger
@@ -83,6 +84,18 @@ class ConnectionManager:
             websocket.state.peer_id = guest_id
             log.info(f"Guest connected in room: {room_code}")
 
+        #broadcast who joined
+        await manager.broadcast(
+            message=json.dumps({
+                "type": "system",
+                "message" : f"Someone joined Room {room_code}",
+                "timestamp": datetime.now().isoformat()
+            }),
+            room_code=room_code,
+            sender=websocket
+        )
+
+
     def disconnect(self, websocket: WebSocket, room_code: str, role: str):
         """
         - Remove websocket from active_hosts || active_guests
@@ -118,24 +131,34 @@ class ConnectionManager:
 
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
+        payload = json.dumps({
+            "type": "system",
+            "message": message,
+            "timestamp": datetime.now().isoformat()
+        })
+        await websocket.send_text(payload)
 
     async def broadcast(self, message: str, room_code: str, sender: WebSocket | None = None):
         log.info(f"BROADCASTING...")
 
-        for room in self.active_rooms.keys():
-            log.info(f"ROOM - {room}")
+        try:
+            msg_data = json.loads(message)
+
+            if msg_data.get("type") == "message":
+                if "timestamp" not in msg_data:
+                    msg_data["timestamp"] = datetime.now().isoformat()
+        except:
+            pass #not JSON message
 
         room = self.active_rooms.get(room_code)
 
         if not room:
-            log.info(f"Broadcast to Room {room_code} failed - DNE")
+            log.info(f"Broadcast to Room {room_code} failed (DNE)")
             return
 
         for peer in room.peers.values():
             ws = peer.websocket
             if ws == sender: continue
-
             await ws.send_text(message)
 
 manager = ConnectionManager()
@@ -148,11 +171,37 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, role: str):
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.send_personal_message(f"My message text was: {data}", websocket)
-            await manager.broadcast(f"Message from {room_code}: {data}", room_code, sender=websocket)
 
+            try:
+                message = json.loads(data)
+                message["sender"] = websocket
+                message["timestamp"] = datetime.now().isoformat()
+                await manager.broadcast(json.dumps(message), room_code, websocket)
+            except json.JSONDecodeError:
+                log.info(f"Invalid JSON received: {data}")
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Invalid message format"
+                }))
+            # await manager.send_personal_message(f"My message text was: {data}", websocket)
+            # await manager.broadcast(f"Message from {room_code}: {data}", room_code, sender=websocket)
+            await manager.send_personal_message(f"My message text was: {data}", websocket)
+            await manager.broadcast(
+                message=json.dumps({
+                    "type": "system",
+                    "message": f"Message from {room_code}: {data}",
+                    "timestamp": datetime.now().isoformat()
+                }),
+                room_code=room_code,
+                sender=websocket
+            )
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_code, role)
+        await manager.broadcast(json.dumps({
+            "type": "system",
+            "message": f"User has left room {room_code}",
+            "timestamp": datetime.now().isoformat(),
+        }), room_code)
 
 
 
