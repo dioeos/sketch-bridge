@@ -89,25 +89,6 @@ class ConnectionManager:
         - If only one active user in room disconnects, kill room
         - If more than one active user in room, update the room participants
         """
-        # websocket_peer_id = websocket.state.peer_id
-        #
-        # if role == "host" and websocket_peer_id in self.active_hosts:
-        #     del self.active_hosts[websocket_peer_id]
-        # else:
-        #     #update peers
-        #     del self.active_guests[websocket_peer_id]
-        #
-        # #update peers in active_rooms (Room obj)
-        # del self.active_rooms[room_code].peers[websocket_peer_id]
-        # self.active_rooms[room_code].peers_count -= 1
-        #
-        # #update peer count for room
-        # num_participants = self.active_rooms[room_code].peers_count
-        # if num_participants == 0:
-        #     #kill room
-        #     del self.active_rooms[room_code]
-        #
-        # log.info(f"Client disconnected from room: {room_code}")
         peer_id = getattr(websocket.state, "peer_id", None)
         if peer_id is None:
             log.info("Disconnect called but websocket has no peer_id")
