@@ -1,87 +1,161 @@
+from dataclasses import dataclass
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from typing import Dict, List, Tuple
 
-app = FastAPI()
+import uuid, base64
 
+import logger
+log = logger.logger
 
-html = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Chat</title>
-    </head>
-    <body>
-        <h1>WebSocket Chat</h1>
-        <h2>Your ID: <span id="ws-id"></span></h2>
-        <form action="" onsubmit="sendMessage(event)">
-            <input type="text" id="messageText" autocomplete="off"/>
-            <button>Send</button>
-        </form>
-        <ul id='messages'>
-        </ul>
-        <script>
-            var client_id = Date.now()
-            document.querySelector("#ws-id").textContent = client_id;
-            var ws = new WebSocket(`ws://localhost:8000/ws/${client_id}`);
-            ws.onmessage = function(event) {
-                var messages = document.getElementById('messages')
-                var message = document.createElement('li')
-                var content = document.createTextNode(event.data)
-                message.appendChild(content)
-                messages.appendChild(message)
-            };
-            function sendMessage(event) {
-                var input = document.getElementById("messageText")
-                ws.send(input.value)
-                input.value = ''
-                event.preventDefault()
-            }
-        </script>
-    </body>
-</html>
-"""
+app = FastAPI(
+    title="Sketch Bridge",
+    version="0.1.0"
+)
+
+@dataclass
+class Peer:
+    peer_id: str
+    websocket: WebSocket
+    is_host: bool
+
+@dataclass
+class Room:
+    code: str
+    peers_count: int
+    peers: Dict[str, Peer] #peer_id -> Peer 
+
+def generate_short_id():
+    return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").rstrip("=")
+
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.active_rooms: Dict[str, Room] = {} #code -> room
+        self.active_hosts: Dict[str, Tuple[WebSocket, str]] = {}
+        self.active_guests: Dict[str, Tuple[WebSocket, str]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, room_code: str, role: str):
         await websocket.accept()
-        self.active_connections.append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if role == "host" and room_code not in self.active_rooms:
+            #create room
+            host_room = Room(
+                code=room_code,
+                peers_count=0,
+                peers={}
+            )
+
+            host_id = generate_short_id()
+
+            host_peer_obj = Peer(
+                peer_id=host_id,
+                websocket=websocket,
+                is_host=True
+            )
+
+            host_room.peers[host_id] = host_peer_obj
+            host_room.peers_count += 1
+
+            self.active_rooms[room_code] = host_room
+            self.active_hosts[host_id] = (websocket, room_code)
+
+            websocket.state.peer_id = host_id
+
+            log.info(f"Host connected in room: {room_code}")
+        else:
+            if room_code not in self.active_rooms:
+                log.info(f"Guest tried to join non-existent room: {room_code}")
+                #tell client and close
+                #await websocket.close(code=1008)
+                return
+
+            guest_id = generate_short_id()
+            guest_peer_obj = Peer(
+                peer_id=guest_id,
+                websocket=websocket,
+                is_host=False
+            )
+            self.active_rooms[room_code].peers[guest_id] = guest_peer_obj
+            self.active_rooms[room_code].peers_count += 1
+            self.active_guests[guest_id] = (websocket, room_code)
+
+            websocket.state.peer_id = guest_id
+            log.info(f"Guest connected in room: {room_code}")
+
+    def disconnect(self, websocket: WebSocket, room_code: str, role: str):
+        """
+        - Remove websocket from active_hosts || active_guests
+        - If only one active user in room disconnects, kill room
+        - If more than one active user in room, update the room participants
+        """
+        # websocket_peer_id = websocket.state.peer_id
+        #
+        # if role == "host" and websocket_peer_id in self.active_hosts:
+        #     del self.active_hosts[websocket_peer_id]
+        # else:
+        #     #update peers
+        #     del self.active_guests[websocket_peer_id]
+        #
+        # #update peers in active_rooms (Room obj)
+        # del self.active_rooms[room_code].peers[websocket_peer_id]
+        # self.active_rooms[room_code].peers_count -= 1
+        #
+        # #update peer count for room
+        # num_participants = self.active_rooms[room_code].peers_count
+        # if num_participants == 0:
+        #     #kill room
+        #     del self.active_rooms[room_code]
+        #
+        # log.info(f"Client disconnected from room: {room_code}")
+        peer_id = getattr(websocket.state, "peer_id", None)
+        if peer_id is None:
+            log.info("Disconnect called but websocket has no peer_id")
+            return
+
+        if role == "host":
+            self.active_hosts.pop(peer_id, None)
+        else:
+            self.active_guests.pop(peer_id, None)
+
+        #update room
+        room = self.active_rooms.get(room_code)
+        if not room:
+            log.info(f"Disconnect: room {room_code} not found")
+            return
+
+        if peer_id in room.peers:
+            del room.peers[peer_id]
+            room.peers_count -= 1
+
+        if room.peers_count <= 0:
+            del self.active_rooms[room_code]
+            log.info(f"Room destroyed: {room_code}")
+
+        log.info(f"Client disconnected from room: {room_code}")
+
+
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
+        return
 
     async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-    async def list_connected_clients(self, websocket: WebSocket):
-        if len(self.active_connections) == 1:
-            await websocket.send_text("You are the first connection!")
-        else:
-            for connection in self.active_connections:
-                await websocket.send_text(f"Connected Clients: {connection}")
+        return
 
 manager = ConnectionManager()
 
-@app.get("/")
-async def get():
-    return HTMLResponse(html)
+@app.websocket("/ws/{room_code}/{role}")
+async def websocket_endpoint(websocket: WebSocket, room_code: str, role: str):
+    log.info(f"Performing websocket endpoint...")
+    await manager.connect(websocket, room_code, role)
 
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int):
-    await manager.connect(websocket)
-    await manager.list_connected_clients(websocket)
-     
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.send_personal_message(f"You wrote: {data}", websocket)
-            await manager.broadcast(f"Client #{client_id} says: {data}")
+            await websocket.send_text(f"Message text was: {data}")
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast((f"Client #{client_id} left the chat"))
+        manager.disconnect(websocket, room_code, role)
+
+
+

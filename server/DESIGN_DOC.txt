@@ -1,0 +1,11 @@
+Room Data Schema:
+
+self.rooms["ROOM_CODE"] = Room (
+  code="ROOM_CODE",
+  host_id="Kurt",
+  peers={
+    "Kurt": Peer(peer_id="Kurt", websocket=<ws_Kurt>, is_host=True)
+    "Spak": Peer(peer_id="Spak", websocket=<ws_Spak>, is_host=False)
+  }
+)
+
