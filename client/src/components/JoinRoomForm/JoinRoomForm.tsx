@@ -18,7 +18,7 @@ export default function JoinRoomForm() {
     }
 
     setError("");
-    navigate(`/join/${normalizedCode}`);
+    navigate(`/${normalizedCode}`, { state: "guest", replace: true });
   };
 
   return (

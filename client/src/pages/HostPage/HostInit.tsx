@@ -7,7 +7,7 @@ export default function HostInit() {
   useEffect(() => {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase();
 
-    navigate(`/host/${code}`, { replace: true });
+    navigate(`/${code}`, { state: "host", replace: true });
   }, []);
 
   return null;

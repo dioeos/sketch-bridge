@@ -119,10 +119,24 @@ class ConnectionManager:
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
-        return
 
-    async def broadcast(self, message: str):
-        return
+    async def broadcast(self, message: str, room_code: str, sender: WebSocket | None = None):
+        log.info(f"BROADCASTING...")
+
+        for room in self.active_rooms.keys():
+            log.info(f"ROOM - {room}")
+
+        room = self.active_rooms.get(room_code)
+
+        if not room:
+            log.info(f"Broadcast to Room {room_code} failed - DNE")
+            return
+
+        for peer in room.peers.values():
+            ws = peer.websocket
+            if ws == sender: continue
+
+            await ws.send_text(message)
 
 manager = ConnectionManager()
 
@@ -134,7 +148,9 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, role: str):
     try:
         while True:
             data = await websocket.receive_text()
-            await websocket.send_text(f"Message text was: {data}")
+            await manager.send_personal_message(f"My message text was: {data}", websocket)
+            await manager.broadcast(f"Message from {room_code}: {data}", room_code, sender=websocket)
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_code, role)
 
