@@ -7,9 +7,8 @@ import uuid
 import base64
 import json
 
-import logger
+from src.logger import logger as log
 
-log = logger.logger
 
 app = FastAPI(title="Sketch Bridge", version="0.1.0")
 
