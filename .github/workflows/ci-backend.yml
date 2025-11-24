@@ -2,6 +2,10 @@ name: Backend CI
 
 on:
   push:
+    branches:
+      - master
+      - dev
+      - "feature/*"
     paths:
       - "server/**"
   pull_request:
@@ -28,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version-file: "pyproject.toml"
+          python-version-file: "server/pyproject.toml"
 
       - name: Install the project
         run: uv sync --locked --all-extras --dev
