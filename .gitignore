@@ -1,3 +1,33 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+*.env
+venv/
+.venv/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Uvicorn reload cache
+*.reload
+*.pid
+
+# ---- Misc ----
+*.swp
+*.swo
+server/DEV_ROADMAP.txt
+
+
+
+# === FRONTEND ===
 # Logs
 logs
 *.log
