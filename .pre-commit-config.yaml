@@ -11,3 +11,23 @@ repos:
     rev: "v1.11.0"
     hooks:
       - id: mypy
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: bash -c "cd client && npx eslint ."
+        language: system
+        pass_filenames: false
+
+      - id: tsc
+        name: TypeScript check
+        entry: bash -c "cd client && npx tsc --noEmit"
+        language: system
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier
+        entry: bash -c "cd client && npx prettier --write ."
+        language: system
+        pass_filenames: false

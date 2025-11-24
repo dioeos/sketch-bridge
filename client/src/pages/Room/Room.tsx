@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router";
 
 import Logger from "../../utils/logger/logger.tsx";
@@ -41,9 +41,10 @@ export default function Room() {
 
       const data = JSON.parse(msg.data);
       switch (data.type) {
-        case "error":
-
-        case "system":
+        case "error": {
+          break;
+        }
+        case "system": {
           const messageId =
             data.id ||
             `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -54,8 +55,8 @@ export default function Room() {
           };
 
           setMessages((prev) => [...prev, processedData]);
+        }
       }
-
       // const messages = document.getElementById("messages");
       // if (!messages) return;
       //

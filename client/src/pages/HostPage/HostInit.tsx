@@ -8,7 +8,7 @@ export default function HostInit() {
     const code = Math.random().toString(36).substring(2, 7).toUpperCase();
 
     navigate(`/${code}`, { state: "host", replace: true });
-  }, []);
+  }, [navigate]);
 
   return null;
 }
