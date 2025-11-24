@@ -1,18 +1,18 @@
 from dataclasses import dataclass
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 from datetime import datetime
 
-import uuid, base64, json
+import uuid
+import base64
+import json
 
 import logger
+
 log = logger.logger
 
-app = FastAPI(
-    title="Sketch Bridge",
-    version="0.1.0"
-)
+app = FastAPI(title="Sketch Bridge", version="0.1.0")
+
 
 @dataclass
 class Peer:
@@ -20,11 +20,13 @@ class Peer:
     websocket: WebSocket
     is_host: bool
 
+
 @dataclass
 class Room:
     code: str
     peers_count: int
-    peers: Dict[str, Peer] #peer_id -> Peer 
+    peers: Dict[str, Peer]  # peer_id -> Peer
+
 
 def generate_short_id():
     return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode("utf-8").rstrip("=")
@@ -32,7 +34,7 @@ def generate_short_id():
 
 class ConnectionManager:
     def __init__(self):
-        self.active_rooms: Dict[str, Room] = {} #code -> room
+        self.active_rooms: Dict[str, Room] = {}  # code -> room
         self.active_hosts: Dict[str, Tuple[WebSocket, str]] = {}
         self.active_guests: Dict[str, Tuple[WebSocket, str]] = {}
 
@@ -40,20 +42,12 @@ class ConnectionManager:
         await websocket.accept()
 
         if role == "host" and room_code not in self.active_rooms:
-            #create room
-            host_room = Room(
-                code=room_code,
-                peers_count=0,
-                peers={}
-            )
+            # create room
+            host_room = Room(code=room_code, peers_count=0, peers={})
 
             host_id = generate_short_id()
 
-            host_peer_obj = Peer(
-                peer_id=host_id,
-                websocket=websocket,
-                is_host=True
-            )
+            host_peer_obj = Peer(peer_id=host_id, websocket=websocket, is_host=True)
 
             host_room.peers[host_id] = host_peer_obj
             host_room.peers_count += 1
@@ -67,16 +61,12 @@ class ConnectionManager:
         else:
             if room_code not in self.active_rooms:
                 log.info(f"Guest tried to join non-existent room: {room_code}")
-                #tell client and close
-                #await websocket.close(code=1008)
+                # tell client and close
+                # await websocket.close(code=1008)
                 return
 
             guest_id = generate_short_id()
-            guest_peer_obj = Peer(
-                peer_id=guest_id,
-                websocket=websocket,
-                is_host=False
-            )
+            guest_peer_obj = Peer(peer_id=guest_id, websocket=websocket, is_host=False)
             self.active_rooms[room_code].peers[guest_id] = guest_peer_obj
             self.active_rooms[room_code].peers_count += 1
             self.active_guests[guest_id] = (websocket, room_code)
@@ -84,17 +74,18 @@ class ConnectionManager:
             websocket.state.peer_id = guest_id
             log.info(f"Guest connected in room: {room_code}")
 
-        #broadcast who joined
+        # broadcast who joined
         await manager.broadcast(
-            message=json.dumps({
-                "type": "system",
-                "message" : f"Someone joined Room {room_code}",
-                "timestamp": datetime.now().isoformat()
-            }),
+            message=json.dumps(
+                {
+                    "type": "system",
+                    "message": f"Someone joined Room {room_code}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ),
             room_code=room_code,
-            sender=websocket
+            sender=websocket,
         )
-
 
     def disconnect(self, websocket: WebSocket, room_code: str, role: str):
         """
@@ -112,7 +103,7 @@ class ConnectionManager:
         else:
             self.active_guests.pop(peer_id, None)
 
-        #update room
+        # update room
         room = self.active_rooms.get(room_code)
         if not room:
             log.info(f"Disconnect: room {room_code} not found")
@@ -128,18 +119,20 @@ class ConnectionManager:
 
         log.info(f"Client disconnected from room: {room_code}")
 
-
-
     async def send_personal_message(self, message: str, websocket: WebSocket):
-        payload = json.dumps({
-            "type": "system",
-            "message": message,
-            "timestamp": datetime.now().isoformat()
-        })
+        payload = json.dumps(
+            {
+                "type": "system",
+                "message": message,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
         await websocket.send_text(payload)
 
-    async def broadcast(self, message: str, room_code: str, sender: WebSocket | None = None):
-        log.info(f"BROADCASTING...")
+    async def broadcast(
+        self, message: str, room_code: str, sender: WebSocket | None = None
+    ):
+        log.info("BROADCASTING...")
 
         try:
             msg_data = json.loads(message)
@@ -147,8 +140,9 @@ class ConnectionManager:
             if msg_data.get("type") == "message":
                 if "timestamp" not in msg_data:
                     msg_data["timestamp"] = datetime.now().isoformat()
-        except:
-            pass #not JSON message
+        except json.JSONDecodeError:
+            log.info("Invalid JSON message")
+            return  # not JSON message
 
         room = self.active_rooms.get(room_code)
 
@@ -158,14 +152,17 @@ class ConnectionManager:
 
         for peer in room.peers.values():
             ws = peer.websocket
-            if ws == sender: continue
+            if ws == sender:
+                continue
             await ws.send_text(message)
+
 
 manager = ConnectionManager()
 
+
 @app.websocket("/ws/{room_code}/{role}")
 async def websocket_endpoint(websocket: WebSocket, room_code: str, role: str):
-    log.info(f"Performing websocket endpoint...")
+    log.info("Performing websocket endpoint...")
     await manager.connect(websocket, room_code, role)
 
     try:
@@ -179,29 +176,34 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, role: str):
                 await manager.broadcast(json.dumps(message), room_code, websocket)
             except json.JSONDecodeError:
                 log.info(f"Invalid JSON received: {data}")
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "message": "Invalid message format"
-                }))
+                await websocket.send_text(
+                    json.dumps({"type": "error", "message": "Invalid message format"})
+                )
             # await manager.send_personal_message(f"My message text was: {data}", websocket)
             # await manager.broadcast(f"Message from {room_code}: {data}", room_code, sender=websocket)
-            await manager.send_personal_message(f"My message text was: {data}", websocket)
+            await manager.send_personal_message(
+                f"My message text was: {data}", websocket
+            )
             await manager.broadcast(
-                message=json.dumps({
-                    "type": "system",
-                    "message": f"Message from {room_code}: {data}",
-                    "timestamp": datetime.now().isoformat()
-                }),
+                message=json.dumps(
+                    {
+                        "type": "system",
+                        "message": f"Message from {room_code}: {data}",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
                 room_code=room_code,
-                sender=websocket
+                sender=websocket,
             )
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_code, role)
-        await manager.broadcast(json.dumps({
-            "type": "system",
-            "message": f"User has left room {room_code}",
-            "timestamp": datetime.now().isoformat(),
-        }), room_code)
-
-
-
+        await manager.broadcast(
+            json.dumps(
+                {
+                    "type": "system",
+                    "message": f"User has left room {room_code}",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ),
+            room_code,
+        )
