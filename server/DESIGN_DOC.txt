@@ -9,3 +9,48 @@ self.rooms["ROOM_CODE"] = Room (
   }
 )
 
+
+
+Data Flow:
+1. Backend creates JSON -> sends over WebSocket
+{
+  "type": "system",
+  "message": "User X left the chat",
+  "timestamp": "2025-11-22T12:34:56",
+  "id": "system-123"
+}
+This becomes a string via `payload = json.dumps({...})`, sending a JSON string over the WebSocket
+
+2. Frontend receives WebSocket message event
+
+socket.onmessage = (msg) => {
+  Logger.info("WS Messaging...");
+  const data = JSON.parse(msg.data)
+}
+
+3. Data is transformed (IDs + timestamps)
+const messageId = data.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2,9)}`;
+
+{
+  id: "msg-1234-abcd",
+  type: "system",
+  message: "User X has left the chat",
+  "timestamp": "2025-11-22T12:34:56",
+}
+
+4. Message is added into React state
+
+setMessages((prev) => [...prev, processedData]);
+
+
+5. React renders messages using .map()
+
+<div>
+  {messages.map((msg) -> 
+    msg.type === "system" ? (
+      <p key={msg.id} className="">
+        {msg.message}
+      </p>
+    ) : null
+  )}
+</div>
