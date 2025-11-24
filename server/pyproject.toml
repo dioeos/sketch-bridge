@@ -1,7 +1,7 @@
 [project]
 name = "server"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sketch Bridge Project"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -34,6 +34,7 @@ dependencies = [
     "rich==14.2.0",
     "rich-toolkit==0.16.0",
     "rignore==0.7.6",
+    "ruff>=0.14.6",
     "sentry-sdk==2.45.0",
     "shellingham==1.5.4",
     "sniffio==1.3.1",
