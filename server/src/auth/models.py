@@ -1,23 +1,35 @@
 from uuid import uuid4
 
-from sqlalchemy import Column, String, select
+from sqlalchemy import select
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
+from passlib.context import CryptContext
 
 from src.database import Base
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
 
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True)
-    email = Column(String, unique=True, nullable=False)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(unique=True, nullable=False)
+    password: Mapped[str] = mapped_column(nullable=False)
+    first_name: Mapped[str] = mapped_column(nullable=False)
+    last_name: Mapped[str] = mapped_column(nullable=False)
 
     @classmethod
     async def create(cls, db: AsyncSession, id=None, **kwargs):
         if not id:
             id = uuid4().hex
+
+        if "password" in kwargs:
+            kwargs["password"] = hash_password(kwargs["password"])
 
         transaction = cls(id=id, **kwargs)
         db.add(transaction)

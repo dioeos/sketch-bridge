@@ -1,28 +1,11 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.auth.models import User as UserModel
+from src.auth.schemas import UserSchemaCreate, UserSchema
 
 router = APIRouter(prefix="/user", tags=["user"])
-
-
-class UserSchemaBase(BaseModel):
-    email: str | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-
-
-class UserSchemaCreate(UserSchemaBase):
-    pass
-
-
-class UserSchema(UserSchemaBase):
-    id: str
-
-    class ConfigDict:
-        from_attributes = True
 
 
 @router.get("/get-user", response_model=UserSchema)
@@ -39,5 +22,5 @@ async def get_users(db: AsyncSession = Depends(get_db)):
 
 @router.post("/create-user", response_model=UserSchema)
 async def create_user(user: UserSchemaCreate, db: AsyncSession = Depends(get_db)):
-    user = await UserModel.create(db, **user.model_dump())
-    return user
+    new_user = await UserModel.create(db, **user.model_dump())
+    return new_user
