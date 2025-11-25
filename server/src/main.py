@@ -6,11 +6,32 @@ from datetime import datetime
 import uuid
 import base64
 import json
-
 from src.logger import logger as log
+
+from contextlib import asynccontextmanager
+from src.config import config
+from src.database import sessionmanager
+
+from src.auth.views import router as user_router
 
 
 app = FastAPI(title="Sketch Bridge", version="0.1.0")
+
+
+def init_app(init_db=True):
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if init_db:
+            sessionmanager.init(config.DB_CONFIG)
+        try:
+            yield
+        finally:
+            if init_db and sessionmanager._engine is not None:
+                await sessionmanager.close()
+
+    server = FastAPI(title="Sketch Bridge", lifespan=lifespan, version="0.1.0")
+    server.include_router(user_router, prefix="/api", tags=["user"])
+    return server
 
 
 @dataclass
