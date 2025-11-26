@@ -2,17 +2,13 @@ from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from passlib.context import CryptContext
 
 from src.database import Base
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(password: str):
-    return pwd_context.hash(password)
+from src.auth.utils import hash_password, get_psql_exception_code
+from src.auth.exceptions import EmailAlreadyExists
+from src.logger import logger
 
 
 class User(Base):
@@ -33,7 +29,20 @@ class User(Base):
 
         transaction = cls(id=id, **kwargs)
         db.add(transaction)
-        await db.commit()
+
+        try:
+            await db.commit()
+        except IntegrityError as ie:
+            await db.rollback()
+
+            err_code = get_psql_exception_code(ie)
+            if err_code == "23505":
+                raise EmailAlreadyExists(kwargs["email"]) from ie
+
+        except Exception as e:
+            logger.exception(f"Unhandled error: {e}")
+            raise
+
         await db.refresh(transaction)
         return transaction
 

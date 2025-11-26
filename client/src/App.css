@@ -26,6 +26,7 @@
 
 @theme {
   --color-snow: #fff;
+  --color-error-red: #ed4337;
   --color-future-blue: #0b468c;
   --color-dark-blue: #092047;
   --color-future-stone: #575267;
