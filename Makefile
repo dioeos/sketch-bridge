@@ -4,13 +4,18 @@ UV_ENV := ../.env
 include .env
 
 .PHONY: help
+
 help:
 	@echo "make help 								Show this help message"
 	@echo "make dev 								Run the app in development mode"
+	@echo "make test 								Run pytest for server"
+	@echo "make build								Build docker containers"
+	@echo "make psql msg=(msg)			Execute PSQL command in Docker Postgres DB"
 	@echo "make clean 							Remove and clean dev containers"
 	@echo "make client-shell				Enter bash shell in temp dev client"
 	@echo "make server-shell				Enter bash shell in temp dev server"
-	@echo "make revision						Create new Alembic revision locally"
+	@echo "make revision						Create new Alembic revision"
+	@echo "make upgrade							Upgrade alembic head"
 	@echo "make reset db						Recreate DB and upgrade alembic head"
 
 dev:
@@ -21,6 +26,13 @@ test:
 
 build:
 	docker-compose -f $(DEV_YML) build
+
+psql:
+	@if [ -z "$(msg)"]; then \
+		echo "Missing MSG: make psql msg=\'message'"; \
+		exit 1; \
+	fi; \
+	docker-compose -f $(DEV_YML) exec postgres_db psql -U sketchbridge-admin -d sketchbridge_db -c "$(msg)"
 
 clean:
 	docker-compose -f $(DEV_YML) down
@@ -38,10 +50,10 @@ revision:
 		echo "Missing MSG: make revision msg=\'message'"; \
 		exit 1; \
 	fi; \
-	cd server && uv run --env-file $(UV_ENV) alembic revision --autogenerate -m "$(msg)"
+	docker-compose -f $(DEV_YML) exec server uv run alembic revision --autogenerate -m "$(msg)"
 
 upgrade:
-	cd server && uv run --env-file $(UV_ENV) alembic upgrade head
+	docker-compose -f $(DEV_YML) exec server uv run alembic upgrade head
 
 reset-db:
 	docker-compose -f $(DEV_YML) down -v
