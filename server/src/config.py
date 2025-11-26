@@ -1,4 +1,5 @@
 import os
+from src.logger import logger
 
 
 class Config:
@@ -10,6 +11,7 @@ class Config:
         port = os.getenv("DATABASE__PORT", "5432")
         db = os.getenv("DATABASE__DB", "fastapi")
 
+        logger.info(f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}")
         return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
 
 

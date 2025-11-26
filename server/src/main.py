@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Tuple
 from datetime import datetime
 
@@ -15,10 +16,10 @@ from src.database import sessionmanager
 from src.auth.views import router as user_router
 
 
-app = FastAPI(title="Sketch Bridge", version="0.1.0")
+origins = ["http://localhost", "http://localhost:8080", "http://localhost:5173"]
 
 
-def init_app(init_db=True):
+def init_app(init_db=True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         if init_db:
@@ -31,7 +32,18 @@ def init_app(init_db=True):
 
     server = FastAPI(title="Sketch Bridge", lifespan=lifespan, version="0.1.0")
     server.include_router(user_router, prefix="/api", tags=["user"])
+
+    server.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     return server
+
+
+app = init_app()
 
 
 @dataclass

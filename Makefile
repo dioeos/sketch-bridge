@@ -52,7 +52,7 @@ reset-db:
 		sleep 1; \
 	done
 
-	cd server && uv run --env-file $(UV_ENV) alembic upgrade head
+	docker-compose -f $(DEV_YML) exec server uv run alembic upgrade head
 	docker-compose -f $(DEV_YML) logs -f
 
 
