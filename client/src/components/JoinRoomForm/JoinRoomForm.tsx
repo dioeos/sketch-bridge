@@ -7,7 +7,7 @@ export default function JoinRoomForm() {
 
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const normalizedCode: string = code.trim().toUpperCase();
