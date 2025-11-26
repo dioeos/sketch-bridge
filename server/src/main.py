@@ -15,6 +15,9 @@ from src.database import sessionmanager
 
 from src.auth.views import router as user_router
 
+from src.auth.exceptions import email_exists_exception_handler
+from src.auth.exceptions import EmailAlreadyExists
+
 
 origins = ["http://localhost", "http://localhost:8080", "http://localhost:5173"]
 
@@ -31,7 +34,11 @@ def init_app(init_db=True) -> FastAPI:
                 await sessionmanager.close()
 
     server = FastAPI(title="Sketch Bridge", lifespan=lifespan, version="0.1.0")
+    # routers
     server.include_router(user_router, prefix="/api", tags=["user"])
+
+    # exception handlers
+    server.add_exception_handler(EmailAlreadyExists, email_exists_exception_handler)
 
     server.add_middleware(
         CORSMiddleware,

@@ -2,15 +2,15 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserSchemaBase(BaseModel):
-    email: EmailStr | None = None
-    first_name: str | None = None
-    last_name: str | None = None
+    email: EmailStr
+    first_name: str
+    last_name: str
 
 
 class UserSchemaCreate(UserSchemaBase):
     """User Schema when client sends data to create user"""
 
-    password: str | None = None
+    password: str
 
 
 class UserSchema(UserSchemaBase):

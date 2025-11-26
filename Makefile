@@ -1,5 +1,7 @@
 DEV_YML := docker-compose.dev.yml
 UV_ENV := ../.env
+POWERSHELL := /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe 
+
 
 include .env
 
@@ -8,6 +10,7 @@ include .env
 help:
 	@echo "make help 								Show this help message"
 	@echo "make dev 								Run the app in development mode"
+	@echo "make connection					Execute ADB reverse porting for Meta Quest 3 connection"
 	@echo "make test 								Run pytest for server"
 	@echo "make build								Build docker containers"
 	@echo "make psql msg=(msg)			Execute PSQL command in Docker Postgres DB"
@@ -20,6 +23,11 @@ help:
 
 dev:
 	docker-compose -f $(DEV_YML) up
+
+connection:
+	$(POWERSHELL) -NoExit -Command "Set-Location ~" && \
+		adb reverse tcp:5173 tcp:5173 \
+		adb reverse tcp:8000 tcp:8000
 
 test:
 	cd server && PYTHONPATH=./ uv run pytest
