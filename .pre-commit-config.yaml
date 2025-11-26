@@ -4,13 +4,19 @@ repos:
     hooks:
       #run linter
       - id: ruff-check
+        exclude: "^(server/alembic/)"
+        files: "^server/(src|tests)/"
       #run formatter
       - id: ruff-format
+        exclude: "^(server/alembic/)"
+        files: "^server/(src|tests)/"
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.11.0"
     hooks:
       - id: mypy
+        exclude: "^(server/alembic/)"
+        files: "^server/(src|tests)/"
 
   - repo: local
     hooks:
@@ -19,15 +25,18 @@ repos:
         entry: bash -c "cd client && npx eslint ."
         language: system
         pass_filenames: false
+        files: "^client/"
 
       - id: tsc
         name: TypeScript check
         entry: bash -c "cd client && npx tsc --noEmit"
         language: system
         pass_filenames: false
+        files: "^client/"
 
       - id: prettier
         name: prettier
         entry: bash -c "cd client && npx prettier --write ."
         language: system
         pass_filenames: false
+        files: "^client/"

@@ -8,6 +8,7 @@ import "./index.css";
 
 import HostInit from "./pages/HostPage/HostInit.tsx";
 import JoinPage from "./pages/JoinPage/JoinPage.tsx";
+import SignUpPage from "./pages/SignUpPage/SignUpPage.tsx";
 
 import Room from "./pages/Room/Room.tsx";
 
@@ -27,6 +28,7 @@ ReactDOM.createRoot(root).render(
       <Route path="/host" element={<HostInit />} />
       <Route path="/join" element={<JoinPage />} />
       <Route path="/:code" element={<Room />} />
+      <Route path="/sign-up" element={<SignUpPage />} />
     </Routes>
   </BrowserRouter>,
 );

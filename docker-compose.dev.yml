@@ -1,4 +1,18 @@
 services:
+  postgres_db:
+    restart: unless-stopped
+    image: postgres:17
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${DATABASE__DB}
+      - POSTGRES_USER=${DATABASE__USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE__PASSWORD}
+    ports:
+      - "${DATABASE__PORT}:5432"
+
   server:
     build:
       context: ./server
@@ -32,3 +46,6 @@ services:
     environment:
       - NODE_ENV=development
     command: npm run dev -- --host
+
+volumes:
+  postgres_db:

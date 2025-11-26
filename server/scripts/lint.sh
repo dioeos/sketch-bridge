@@ -3,6 +3,6 @@
 set -e
 set -x
 
-mypy src             # type check
+mypy src --check-untyped-defs  # type check
 ruff check src tests        # linter
 ruff format src --check # formatter

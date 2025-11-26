@@ -39,3 +39,28 @@ jobs:
 
       - name: Lint Python files
         run: uv run ./scripts/lint.sh
+
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.11"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "server/pyproject.toml"
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run pytest
+        run: PYTHONPATH=./ uv run pytest
