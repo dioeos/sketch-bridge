@@ -72,3 +72,23 @@ async def session_override(app, connection_test):
             yield session
 
     app.dependency_overrides[get_db] = get_db_override
+
+
+@pytest.fixture(scope="session")
+def db_manager(connection_test):
+    """Pytest fixture that gives initialized sessionmanager"""
+    return sessionmanager
+
+
+@pytest_asyncio.fixture
+async def db_connection(db_manager):
+    """Low level connection fixture using sessionmanager.connect()"""
+    async with db_manager.connect() as conn:
+        yield conn
+
+
+@pytest_asyncio.fixture
+async def db_session(db_manager):
+    """Async session fixture using sessionmanager.session()"""
+    async with db_manager.session() as session:
+        yield session

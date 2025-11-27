@@ -30,7 +30,7 @@ connection:
 		adb reverse tcp:8000 tcp:8000
 
 test:
-	cd server && PYTHONPATH=./ uv run pytest
+	cd server && PYTHONPATH=./ uv run pytest --quiet --capture=no
 
 build:
 	docker-compose -f $(DEV_YML) build
