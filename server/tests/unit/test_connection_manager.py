@@ -1,6 +1,6 @@
 from typing import cast
 from fastapi import WebSocket
-from .dummy import DummyWebSocket
+from tests.unit.dummy import DummyWebSocket
 from src.sockets.service import ConnectionManager
 
 
