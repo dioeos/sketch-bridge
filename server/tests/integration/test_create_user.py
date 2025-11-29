@@ -1,11 +1,10 @@
 import pytest
-from src.auth.models import User
+from src.auth.models import User as UserModel
 
 # from src.logger import logger
 from sqlalchemy import select, text
 
 
-# === API LEVEL TESTS ===
 def test_create_user(client):
     """Test that `/api/user/get-users correctly functions on valid inputs and exists in the DB by calling the user `GET` functions"""
     response = client.get("/api/user/get-users")
@@ -37,8 +36,120 @@ def test_create_user(client):
     assert len(response.json()) == 1
 
 
-def test_duplicate_emails_signup(client):
-    """Tests that when a user fails to signup with an existing email, they receive HTTP 409 and that the `GET` functions correctly show that the user does not exist"""
+async def test_duplicate_emails_verified_signup(client, db_session):
+    """Tests that when a user signs up with verified existing email, they receive HTTP 409 and that `GET` only shows 1 row in the user table"""
+    await _insert_verified_user(db_session)
+
+    response = client.get("/api/user/get-users")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    response = client.post(
+        "/api/user/create-user",
+        json={
+            "email": "verified@example.com",
+            "first_name": "first",
+            "last_name": "last",
+            "password": "password",
+        },
+    )
+
+    assert response.status_code == 409
+    response = client.get("/api/user/get-users")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+async def test_duplicate_emails_unverified_signup_updates_kwargs_fields(
+    client, db_session
+):
+    """Tests that when a user signs up with unverified existing email, it updates kwargs fields in DB and user receives HTTP 200"""
+    response = client.get("/api/user/get-users")
+    assert response.status_code == 200
+    assert len(response.json()) == 0
+
+    response = client.post(
+        "/api/user/create-user",
+        json={
+            "email": "email1@example.com",
+            "first_name": "first",
+            "last_name": "last",
+            "password": "password",
+        },
+    )
+
+    response = client.get("/api/user/get-users")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+    result = await db_session.execute(
+        select(UserModel).where(UserModel.email == "email1@example.com")
+    )
+    user = result.scalar_one()
+    assert user.is_verified is False
+    assert user.first_name == "first"
+    assert user.last_name == "last"
+
+    hashed_pass = user.password
+
+    response = client.post(
+        "/api/user/create-user",
+        json={
+            "email": "email1@example.com",
+            "first_name": "HELLO",
+            "last_name": "WORLD",
+            "password": "PYTHON",
+        },
+    )
+    await db_session.refresh(user)
+
+    assert user.is_verified is False
+
+    assert user.first_name == "HELLO"
+    assert user.last_name == "WORLD"
+    assert user.password != hashed_pass
+
+
+async def test_duplicate_emails_verified_signup_does_not_update_kwargs_fields(
+    client, db_session
+):
+    """Tests that when a user signs up with verified existing email, it does not update kwargs fields in DB and user receives HTTP 409"""
+    await _insert_verified_user(db_session)
+
+    result = await db_session.execute(
+        select(UserModel).where(UserModel.email == "verified@example.com")
+    )
+    user = result.scalar_one()
+    assert user.is_verified is True
+    assert user.first_name == "first"
+    assert user.last_name == "last"
+    assert user.password == "pw"
+
+    response = client.post(
+        "/api/user/create-user",
+        json={
+            "email": "verified@example.com",
+            "first_name": "notfirst",
+            "last_name": "notlast",
+            "password": "somepass",
+        },
+    )
+
+    assert response.status_code == 409
+
+    result = await db_session.execute(
+        select(UserModel).where(UserModel.email == "verified@example.com")
+    )
+
+    assert user.is_verified is True
+    assert user.first_name == "first"
+    assert user.last_name == "last"
+    assert user.password == "pw"
+
+
+async def test_duplicate_emails_unverified_signup(client, db_session):
+    """Tests that when a user signs up with unverified existing email, they receive HTTP 200 and that `GET` only shows 1 row in the user table"""
+
     response = client.get("/api/user/get-users")
     assert response.status_code == 200
     assert response.json() == []
@@ -63,6 +174,13 @@ def test_duplicate_emails_signup(client):
         "last_name": "turing",
     }
 
+    # check verification
+    result = await db_session.execute(
+        select(UserModel).where(UserModel.email == "alanturing@gmail.com")
+    )
+    user = result.scalar_one()
+    assert user.is_verified is False
+
     response = client.get("/api/user/get-users")
     assert response.status_code == 200
     assert len(response.json()) == 1
@@ -77,16 +195,21 @@ def test_duplicate_emails_signup(client):
         },
     )
 
-    assert response.status_code == 409
+    assert response.status_code == 200
 
     response = client.get("/api/user/get-users")
     assert response.status_code == 200
     assert len(response.json()) == 1
 
+    result = await db_session.execute(
+        select(UserModel).where(UserModel.email == "alanturing@gmail.com")
+    )
+    user = result.scalar_one()
+    assert user.is_verified is False
 
-# === DB LEVEL TESTS ===
+
 async def test_duplicate_email_is_atomic(client, db_session):
-    """Tests that when a duplicate email is submitted, return HTTP 409 and a second user row is not inserted"""
+    """Tests that when a unverified duplicate email is submitted, return HTTP 200 and a second user row is not inserted"""
     payload = {
         "email": "alaturing@gmail.com",
         "first_name": "alan",
@@ -101,11 +224,11 @@ async def test_duplicate_email_is_atomic(client, db_session):
     assert user_id is not None
 
     resp2 = client.post("/api/user/create-user", json=payload)
-    assert resp2.status_code == 409
+    assert resp2.status_code == 200
 
     # verify DB level
     result = await db_session.execute(
-        select(User).where(User.email == payload["email"])
+        select(UserModel).where(UserModel.email == payload["email"])
     )
     users = result.scalars().all()
     assert len(users) == 1
@@ -114,29 +237,56 @@ async def test_duplicate_email_is_atomic(client, db_session):
 
 async def test_connect_rolls_back_on_error(db_session):
     """Tests that upon error, a DB transaction rolls back and is not commited"""
-    from src.sockets.utils import generate_short_id
-
-    id = generate_short_id()
 
     with pytest.raises(RuntimeError):
-        async with db_session.begin():
-            await db_session.execute(
-                text("""
-                    INSERT INTO users (id, email, password, first_name, last_name)
-                    VALUES (:id, :email, :password, :first_name, :last_name)
-                """),
-                {
-                    "id": id,
-                    "email": "rollback@example.com",
-                    "password": "pw",
-                    "first_name": "first",
-                    "last_name": "last",
-                },
-            )
-            raise RuntimeError("Failure mid transaction")
+        await _insert_and_fail(db_session)
 
     result = await db_session.execute(
-        select(User).where(User.email == "rollback@example.com")
+        select(UserModel).where(UserModel.email == "rollback@example.com")
     )
     users = result.scalars().all()
     assert users == []
+
+
+# ==HELPERS==
+async def _insert_and_fail(db_session):
+    from src.sockets.utils import generate_short_id
+
+    id = generate_short_id()
+    async with db_session.begin():
+        await db_session.execute(
+            text("""
+                INSERT INTO users (id, email, password, first_name, last_name, is_verified)
+                VALUES (:id, :email, :password, :first_name, :last_name, :is_verified)
+            """),
+            {
+                "id": id,
+                "email": "rollback@example.com",
+                "password": "pw",
+                "first_name": "first",
+                "last_name": "last",
+                "is_verified": False,
+            },
+        )
+        raise RuntimeError("Failure mid transaction")
+
+
+async def _insert_verified_user(db_session):
+    from src.sockets.utils import generate_short_id
+
+    id = generate_short_id()
+    async with db_session.begin():
+        await db_session.execute(
+            text("""
+                INSERT INTO users (id, email, password, first_name, last_name, is_verified)
+                VALUES (:id, :email, :password, :first_name, :last_name, :is_verified)
+            """),
+            {
+                "id": id,
+                "email": "verified@example.com",
+                "password": "pw",
+                "first_name": "first",
+                "last_name": "last",
+                "is_verified": True,
+            },
+        )
