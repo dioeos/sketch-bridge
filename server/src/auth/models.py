@@ -18,6 +18,7 @@ class User(Base):
     password: Mapped[str] = mapped_column(nullable=False)
     first_name: Mapped[str] = mapped_column(nullable=False)
     last_name: Mapped[str] = mapped_column(nullable=False)
+    is_verified: Mapped[bool] = mapped_column(nullable=False)
 
     @classmethod
     async def create(cls, db: AsyncSession, id=None, **kwargs):
@@ -27,8 +28,8 @@ class User(Base):
         if "password" in kwargs:
             kwargs["password"] = hash_password(kwargs["password"])
 
-        transaction = cls(id=id, **kwargs)
-        db.add(transaction)
+        user = cls(id=id, is_verified=False, **kwargs)
+        db.add(user)
 
         try:
             await db.commit()
@@ -37,14 +38,29 @@ class User(Base):
 
             err_code = get_psql_exception_code(ie)
             if err_code == "23505":
-                raise EmailAlreadyExists(kwargs["email"]) from ie
+                email: str = kwargs["email"]
+                if email is None:
+                    raise
+
+                existing: str = await db.scalar(select(cls).where(cls.email == email))
+
+                if existing is None:
+                    raise
+
+                if getattr(existing, "is_verified", False):
+                    raise EmailAlreadyExists(email) from ie
+
+                # returns if not verified, update fields
+                logger.info("User not yet verified, updating fields...")
+                return await cls.update(db, existing, **kwargs)
 
         except Exception as e:
             logger.exception(f"Unhandled error: {e}")
             raise
 
-        await db.refresh(transaction)
-        return transaction
+        else:
+            await db.refresh(user)
+            return user
 
     @classmethod
     async def get(cls, db: AsyncSession, id: str):
@@ -57,3 +73,16 @@ class User(Base):
     @classmethod
     async def get_all(cls, db: AsyncSession):
         return (await db.execute(select(cls))).scalars().all()
+
+    @classmethod
+    async def update(cls, db: AsyncSession, user, **fields):
+        for key, value in fields.items():
+            setattr(user, key, value)
+
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+        await db.refresh(user)
+        return user
