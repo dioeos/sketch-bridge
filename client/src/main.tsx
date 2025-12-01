@@ -5,10 +5,10 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import App from "./App.tsx";
 import "./index.css";
+import { ClerkProvider } from "@clerk/clerk-react";
 
 import HostInit from "./pages/HostPage/HostInit.tsx";
 import JoinPage from "./pages/JoinPage/JoinPage.tsx";
-import SignUpPage from "./pages/SignUpPage/SignUpPage.tsx";
 
 import Room from "./pages/Room/Room.tsx";
 
@@ -17,18 +17,24 @@ import Room from "./pages/Room/Room.tsx";
 //     <App />
 //   </StrictMode>,
 // )
-//
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing publishable key");
+}
 
 const root = document.getElementById("root");
 
 ReactDOM.createRoot(root).render(
-  <BrowserRouter>
-    <Routes>
-      <Route path="/" element={<App />} />
-      <Route path="/host" element={<HostInit />} />
-      <Route path="/join" element={<JoinPage />} />
-      <Route path="/:code" element={<Room />} />
-      <Route path="/sign-up" element={<SignUpPage />} />
-    </Routes>
-  </BrowserRouter>,
+  <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/host" element={<HostInit />} />
+        <Route path="/join" element={<JoinPage />} />
+        <Route path="/:code" element={<Room />} />
+      </Routes>
+    </BrowserRouter>
+    ,
+  </ClerkProvider>,
 );
